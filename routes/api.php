@@ -18,17 +18,6 @@ use App\Http\Controllers\LoyaltyProgramController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\AuditLogController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
-
 Route::prefix('v1')->group(function () {
     // --- Customer Management ---
     Route::get('/customers', [CustomerController::class, 'index']);
@@ -85,24 +74,26 @@ Route::prefix('v1')->group(function () {
     Route::get('/delivery-notes', [DeliveryNoteController::class, 'index']);
     Route::post('/delivery-notes', [DeliveryNoteController::class, 'store']);
     Route::get('/delivery-notes/{id}', [DeliveryNoteController::class, 'show']);
-    Route::post('/orders/{id}/delivery-notes', [DeliveryNoteController::class, 'store']);
+    // Route::post('/orders/{id}/delivery-notes', [DeliveryNoteController::class, 'store']);
+    Route::put('/delivery-notes/{id}', [DeliveryNoteController::class, 'update']);
 
     // --- Returns & Complaints ---
     Route::get('/returns', [ReturnsController::class, 'index']);
     Route::post('/returns', [ReturnsController::class, 'store']);
     Route::get('/returns/{id}', [ReturnsController::class, 'show']);
-    Route::put('/returns/{id}/status', [ReturnsController::class, 'updateStatus']);
+    Route::delete('/returns/{id}', [ReturnsController::class, 'destroy']);
 
     Route::get('/complaints', [ComplaintController::class, 'index']);
     Route::post('/complaints', [ComplaintController::class, 'store']);
     Route::get('/complaints/{id}', [ComplaintController::class, 'show']);
-    Route::put('/complaints/{id}/status', [ComplaintController::class, 'updateStatus']);
+    Route::put('/complaints/{id}status', [ComplaintController::class, 'updateStatus']);
 
     // --- Promotions & Loyalty Programs ---
     Route::get('/promotions', [PromotionController::class, 'index']);
     Route::post('/promotions', [PromotionController::class, 'store']);
     Route::get('/promotions/{id}', [PromotionController::class, 'show']);
     Route::put('/promotions/{id}', [PromotionController::class, 'update']);
+    Route::get('/promotions/active', [PromotionController::class, 'getActivePromotions']);
 
     Route::get('/coupons', [CouponController::class, 'index']);
     Route::post('/coupons', [CouponController::class, 'store']);
@@ -113,12 +104,10 @@ Route::prefix('v1')->group(function () {
     Route::post('/loyalty-programs', [LoyaltyProgramController::class, 'store']);
     Route::get('/loyalty-programs/{id}', [LoyaltyProgramController::class, 'show']);
     Route::put('/loyalty-programs/{id}', [LoyaltyProgramController::class, 'update']);
-    Route::get('/customers/{id}/loyalty-points', [LoyaltyProgramController::class, 'getCustomerPoints']);
 
     // --- Reporting & Visualization Data ---
     Route::get('/reports/sales-trends', [ReportController::class, 'salesTrends']);
     Route::get('/reports/price-trends', [ReportController::class, 'priceTrends']);
-    Route::get('/reports/customer-activity', [ReportController::class, 'customerActivity']);
     Route::get('/reports/inventory-status', [ReportController::class, 'inventoryStatus']);
 
     // --- Audit Logs (Internal/Admin only) ---

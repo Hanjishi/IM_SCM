@@ -4,9 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class CustomerLoyaltyPoint extends Model
+class LoyaltyPoint extends Model
 {
-   protected $table = 'loyalty_points';
+    protected $table = 'loyalty_points';
     protected $primaryKey = 'points_id';
 
     protected $fillable = [

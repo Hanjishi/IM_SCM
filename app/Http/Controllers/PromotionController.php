@@ -18,18 +18,25 @@ class PromotionController extends Controller
     public function store(Request $request)
     {
         $this->validate($request, [
-            'name' => 'required|string|max:255',
-            'description' => 'required|string',
+            'promotion_name' => 'required|string|max:255',
             'discount_type' => 'required|in:percentage,fixed_amount',
             'discount_value' => 'required|numeric|min:0',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'minimum_purchase' => 'nullable|numeric|min:0',
-            'maximum_discount' => 'nullable|numeric|min:0',
             'is_active' => 'boolean'
         ]);
 
-        $promotion = Promotion::create($request->all());
+        $promotion = Promotion::create([
+            'promotion_name' => $request->input('name'),
+            'promotion_type' => $request->input('discount_type'),
+            'discount_value' => $request->input('discount_value'),
+            'min_order_amount' => $request->input('minimum_purchase'),
+            'start_date' => $request->input('start_date'),
+            'end_date' => $request->input('end_date'),
+            'is_active' => $request->input('is_active', true),
+        ]);
+
         return response()->json($promotion, Response::HTTP_CREATED);
     }
 
@@ -42,31 +49,52 @@ class PromotionController extends Controller
     public function update(Request $request, $id)
     {
         $promotion = Promotion::findOrFail($id);
-        
+
         $this->validate($request, [
-            'name' => 'string|max:255',
-            'description' => 'string',
-            'discount_type' => 'in:percentage,fixed_amount',
-            'discount_value' => 'numeric|min:0',
-            'start_date' => 'date',
-            'end_date' => 'date|after:start_date',
+            'name' => 'sometimes|string|max:255',
+            'discount_type' => 'sometimes|in:percentage,fixed_amount',
+            'discount_value' => 'sometimes|numeric|min:0',
+            'start_date' => 'sometimes|date',
+            'end_date' => 'sometimes|date|after:start_date',
             'minimum_purchase' => 'nullable|numeric|min:0',
-            'maximum_discount' => 'nullable|numeric|min:0',
             'is_active' => 'boolean'
         ]);
 
-        $promotion->update($request->all());
+        $promotion->update([
+            'promotion_name' => $request->input('name', $promotion->promotion_name),
+            'promotion_type' => $request->input('discount_type', $promotion->promotion_type),
+            'discount_value' => $request->input('discount_value', $promotion->discount_value),
+            'min_order_amount' => $request->input('minimum_purchase', $promotion->min_order_amount),
+            'start_date' => $request->input('start_date', $promotion->start_date),
+            'end_date' => $request->input('end_date', $promotion->end_date),
+            'is_active' => $request->input('is_active', $promotion->is_active),
+        ]);
+
         return response()->json($promotion);
     }
 
     public function getActivePromotions()
     {
         $now = now();
+
         $promotions = Promotion::where('is_active', true)
             ->where('start_date', '<=', $now)
             ->where('end_date', '>=', $now)
             ->get();
-        return response()->json($promotions);
+
+        if ($promotions->isEmpty()) {
+            return response()->json([
+                'status' => 'empty',
+                'message' => 'No active promotions available at the moment.',
+                'data' => []
+            ], 200);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Active promotions retrieved successfully.',
+            'data' => $promotions
+        ], 200);
     }
 
     public function applyPromotion(Request $request)

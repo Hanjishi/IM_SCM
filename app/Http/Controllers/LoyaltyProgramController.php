@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\LoyaltyProgram;
+use App\Models\LoyaltyPoint;
 use App\Models\CustomerLoyaltyPoint;
 use App\Models\PointTransaction;
 use Illuminate\Http\Request;
@@ -16,20 +17,29 @@ class LoyaltyProgramController extends Controller
         return response()->json($programs);
     }
 
-    public function store(Request $request)
+   public function store(Request $request)
     {
         $this->validate($request, [
-            'name' => 'required|string|max:255',
+            'program_name' => 'required|string|max:255',
             'description' => 'required|string',
-            'points_per_currency' => 'required|numeric|min:0',
-            'minimum_points_redemption' => 'required|integer|min:1',
-            'points_value' => 'required|numeric|min:0',
-            'is_active' => 'boolean'
+            'points_multiplier' => 'required|numeric|min:0',
+            'minimum_purchase_amount' => 'required|numeric|min:0',
+            'points_expiry_days' => 'required|integer|min:1',
+            'status' => 'boolean'
         ]);
 
-        $program = LoyaltyProgram::create($request->all());
+        $program = LoyaltyProgram::create($request->only([
+            'program_name',
+            'description',
+            'points_multiplier',
+            'minimum_purchase_amount',
+            'points_expiry_days',
+            'status'
+        ]));
+
         return response()->json($program, Response::HTTP_CREATED);
     }
+
 
     public function show($id)
     {
@@ -56,11 +66,11 @@ class LoyaltyProgramController extends Controller
 
     public function getCustomerPoints($customerId)
     {
-        $loyaltyPoints = CustomerLoyaltyPoint::where('customer_id', $customerId)
-            ->with(['loyaltyProgram', 'transactions'])
-            ->get();
-        return response()->json($loyaltyPoints);
+        $points = LoyaltyPoints::with('transactions')->where('customer_id', $id)->get();
+
+        return response()->json($points);
     }
+
 
     public function addPoints(Request $request)
     {

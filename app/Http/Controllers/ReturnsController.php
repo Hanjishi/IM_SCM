@@ -10,87 +10,64 @@ use Illuminate\Http\Response;
 
 class ReturnsController extends Controller
 {
-    public function index()
-    {
-        $returns = Returns::with(['customer', 'salesOrder', 'items'])->get();
-        return response()->json($returns);
-    }
+        public function index()
+        {
+            $returns = Returns::with(['customer', 'order', 'items'])->get();
+            return response()->json($returns);
+        }
 
-    public function store(Request $request)
-    {
-        $this->validate($request, [
-            'sales_order_id' => 'required|exists:sales_orders,id',
-            'customer_id' => 'required|exists:customers,id',
-            'return_reason' => 'required|string',
-            'return_date' => 'required|date',
-            'status' => 'required|in:pending,approved,rejected,completed',
-            'items' => 'required|array',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.reason' => 'required|string'
-        ]);
-
-        $return = Returns::create([
-            'sales_order_id' => $request->sales_order_id,
-            'customer_id' => $request->customer_id,
-            'return_reason' => $request->return_reason,
-            'return_date' => $request->return_date,
-            'status' => $request->status
-        ]);
-
-        foreach ($request->items as $item) {
-            $return->items()->create([
-                'product_id' => $item['product_id'],
-                'quantity' => $item['quantity'],
-                'reason' => $item['reason']
+        public function store(Request $request)
+        {
+            $this->validate($request, [
+                'order_id' => 'required|exists:sales_orders,order_id',
+                'customer_id' => 'required|exists:customers,customer_id',
+                'return_date' => 'required|date',
+                'reason_for_return' => 'required|string',
+                'product_condition' => 'nullable|string',
+                'resolution_status' => 'required|in:pending,approved,rejected,completed',
+                'refund_amount' => 'nullable|numeric|min:0',
+                'refund_method' => 'nullable|string',
+                'restocking_fee' => 'nullable|numeric|min:0',
+                'items' => 'required|array',
+                'items.*.product_id' => 'required|exists:products,product_id',
+                'items.*.quantity' => 'required|integer|min:1',
+                'items.*.reason' => 'required|string'
             ]);
-        }
 
-        return response()->json($return->load('items'), Response::HTTP_CREATED);
-    }
+            $return = Returns::create([
+                'order_id' => $request->order_id,
+                'customer_id' => $request->customer_id,
+                'return_date' => $request->return_date,
+                'reason_for_return' => $request->reason_for_return,
+                'product_condition' => $request->product_condition,
+                'resolution_status' => $request->resolution_status,
+                'refund_amount' => $request->refund_amount,
+                'refund_method' => $request->refund_method,
+                'restocking_fee' => $request->restocking_fee,
+            ]);
 
-    public function show($id)
-    {
-        $return = Returns::with(['customer', 'salesOrder', 'items'])->findOrFail($id);
-        return response()->json($return);
-    }
-
-    public function updateStatus(Request $request, $id)
-    {
-        $return = Returns::findOrFail($id);
-        
-        $this->validate($request, [
-            'status' => 'required|in:pending,approved,rejected,completed'
-        ]);
-
-        $return->status = $request->status;
-        $return->save();
-
-        // If approved, update inventory
-        if ($request->status === 'approved') {
-            foreach ($return->items as $item) {
-                $product = $item->product;
-                $product->stock_quantity += $item->quantity;
-                $product->save();
+            foreach ($request->items as $item) {
+                $return->items()->create([
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'reason' => $item['reason'],
+                ]);
             }
+
+            return response()->json($return->load(['customer', 'order', 'items']), Response::HTTP_CREATED);
         }
 
-        return response()->json($return->load('items'));
-    }
+        public function show($id)
+        {
+            $return = Returns::with(['customer', 'order', 'items'])->findOrFail($id);
+            return response()->json($return);
+        }
 
-    public function getByCustomer($customerId)
-    {
-        $returns = Returns::where('customer_id', $customerId)
-            ->with(['salesOrder', 'items'])
-            ->get();
-        return response()->json($returns);
-    }
+        public function destroy($id)
+        {
+            $return = Returns::with('items.product')->findOrFail($id);
 
-    public function getBySalesOrder($salesOrderId)
-    {
-        $returns = Returns::where('sales_order_id', $salesOrderId)
-            ->with(['customer', 'items'])
-            ->get();
-        return response()->json($returns);
-    }
-} 
+            $return->delete();
+            return response()->json(['message' => 'Return deleted successfully']);
+        }
+}

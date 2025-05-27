@@ -6,17 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class ReturnItem extends Model
 {
-    protected $table = 'return_items';
+    protected $table = 'return_items'; // Make sure your table name is correct
     protected $primaryKey = 'return_item_id';
 
     protected $fillable = [
         'return_id',
         'product_id',
         'quantity',
-        'unit_price_at_return',
+        'reason'
     ];
 
-    public function returns()
+    public function return()
     {
         return $this->belongsTo(Returns::class, 'return_id', 'return_id');
     }

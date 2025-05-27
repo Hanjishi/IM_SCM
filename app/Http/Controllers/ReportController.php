@@ -26,7 +26,7 @@ class ReportController extends Controller
                 'product_category_id' => 'nullable|exists:product_categories,product_category_id',
                 'region' => 'nullable|string',
                 'customer_type' => 'nullable|string',
-                'sales_rep_id' => 'nullable|exists:sales_representatives,sales_rep_id',
+                'representative_id' => 'nullable|exists:sales_representatives,representative_id',
             ]);
 
             $startDate = $request->input('start_date') ? Carbon::parse($request->input('start_date')) : Carbon::now()->subMonths(6);
@@ -39,22 +39,29 @@ class ReportController extends Controller
             ->where('order_status', '!=', 'Canceled'); // Exclude canceled orders
 
             // Apply segmentation filters (Rule 6.2)
-            if ($request->has('product_category_id')) {
+            $joinedProducts = false;
+            $joinedCustomers = false;
+
+            if ($request->has('product_category_id') && !$joinedProducts) {
                 $query->join('sales_order_items', 'sales_orders.order_id', '=', 'sales_order_items.order_id')
-                      ->join('products', 'sales_order_items.product_id', '=', 'products.product_id')
-                      ->where('products.product_category_id', $request->input('product_category_id'));
+                    ->join('products', 'sales_order_items.product_id', '=', 'products.product_id');
+                $joinedProducts = true;
+
+                $query->where('products.product_category_id', $request->input('product_category_id'));
             }
+
+            if (($request->has('region') || $request->has('customer_type')) && !$joinedCustomers) {
+                $query->join('customers', 'sales_orders.customer_id', '=', 'customers.customer_id');
+                $joinedCustomers = true;
+            }
+
             if ($request->has('region')) {
-                $query->join('customers', 'sales_orders.customer_id', '=', 'customers.customer_id')
-                      ->where('customers.region', $request->input('region'));
+                $query->where('customers.region', $request->input('region'));
             }
             if ($request->has('customer_type')) {
-                $query->join('customers', 'sales_orders.customer_id', '=', 'customers.customer_id')
-                      ->where('customers.customer_type', $request->input('customer_type'));
+                $query->where('customers.customer_type', $request->input('customer_type'));
             }
-            if ($request->has('sales_rep_id')) {
-                $query->where('sales_orders.sales_rep_id', $request->input('sales_rep_id'));
-            }
+
 
             // Grouping by period (Rule 6.1)
             switch ($request->input('period')) {
@@ -112,48 +119,51 @@ class ReportController extends Controller
             if ($request->has('product_id')) {
                 $priceHistoryQuery->where('product_id', $request->input('product_id'));
                 $productIds = [$request->input('product_id')];
-            } else { // product_category_id is present
+            } else {
                 $productIds = DB::table('products')
-                                ->where('product_category_id', $request->input('product_category_id'))
-                                ->pluck('product_id')
-                                ->toArray();
+                    ->where('product_category_id', $request->input('product_category_id'))
+                    ->pluck('product_id')
+                    ->toArray();
+
+                if (empty($productIds)) {
+                    return response()->json([]);
+                }
+
                 $priceHistoryQuery->whereIn('product_id', $productIds);
             }
 
-            $priceTrends = $priceHistoryQuery->get()->groupBy(function($date) {
-                return Carbon::parse($date->change_date)->format('Y-m-d'); // Group by day
+            $priceTrends = $priceHistoryQuery->get()->groupBy(function($entry) {
+                return Carbon::parse($entry->change_date)->format('Y-m-d');
             })->map(function ($items, $date) {
-                // Get the latest price for that day if multiple changes
                 $latestPrice = $items->sortByDesc('change_date')->first();
                 return [
                     'date' => $date,
                     'price' => $latestPrice->new_price,
-                    'product_id' => $latestPrice->product_id, // Useful if multiple products
+                    'product_id' => $latestPrice->product_id,
                 ];
-            })->values()->sortBy('date'); // Ensure chronological order
+            })->values()->sortBy('date');
 
-            // Fetch sales volume for the same period and products
-            $salesVolumeQuery = SalesOrder::select(
-                DB::raw('DATE(order_date) as date'),
-                DB::raw('SUM(sales_order_items.quantity) as total_quantity_sold')
-            )
-            ->join('sales_order_items', 'sales_orders.order_id', '=', 'sales_order_items.order_id')
-            ->whereIn('sales_order_items.product_id', $productIds)
-            ->whereBetween('order_date', [$startDate, $endDate])
-            ->where('order_status', '!=', 'Canceled')
-            ->groupBy(DB::raw('DATE(order_date)'))
-            ->orderBy('date')
-            ->get()
-            ->keyBy('date'); // Key by date for easy merging
+            $salesVolume = SalesOrder::select(
+                    DB::raw('DATE(order_date) as date'),
+                    DB::raw('SUM(sales_order_items.quantity) as total_quantity_sold')
+                )
+                ->join('sales_order_items', 'sales_orders.order_id', '=', 'sales_order_items.order_id')
+                ->whereIn('sales_order_items.product_id', $productIds)
+                ->whereBetween('order_date', [$startDate, $endDate])
+                ->where('order_status', '!=', 'Canceled')
+                ->groupBy(DB::raw('DATE(order_date)'))
+                ->orderBy('date')
+                ->get()
+                ->keyBy('date');
 
-            // Merge price trends with sales volume
-            $mergedData = $priceTrends->map(function ($pricePoint) use ($salesVolumeQuery) {
-                $salesData = $salesVolumeQuery->get($pricePoint['date']);
-                $pricePoint['sales_volume'] = $salesData ? (int)$salesData->total_quantity_sold : 0;
+            $mergedData = $priceTrends->map(function ($pricePoint) use ($salesVolume) {
+                $salesData = $salesVolume->get($pricePoint['date']);
+                $pricePoint['sales_volume'] = $salesData ? (int) $salesData->total_quantity_sold : 0;
                 return $pricePoint;
             });
 
             return response()->json($mergedData->values());
+
         } catch (ValidationException $e) {
             return response()->json(['errors' => $e->errors()], 422);
         } catch (\Exception $e) {
@@ -161,6 +171,19 @@ class ReportController extends Controller
         }
     }
 
+    public function inventoryStatus(Request $request)
+    {
+        try {
+            // Assuming you have an Inventory model or use Product model with stock quantity
+            $inventoryData = DB::table('products')
+                ->select('product_id', 'product_name', 'stock_quantity') // Adjust columns to your schema
+                ->get();
+
+            return response()->json($inventoryData);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Error fetching inventory status: ' . $e->getMessage()], 500);
+        }
+    }
     // You can add predictive analytics (Rule 7.4) here.
     // This would typically involve more complex statistical/ML models,
     // which might be integrated as a separate service or a heavier library.

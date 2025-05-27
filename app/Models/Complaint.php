@@ -16,8 +16,9 @@ class Complaint extends Model
         'complaint_date',
         'complaint_type',
         'description',
-        'resolution_status',
-        'resolution_details',
+        'priority',           
+        'resolution_status',  
+        'resolution_details', 
         'resolved_by',
         'resolved_at',
     ];

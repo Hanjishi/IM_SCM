@@ -24,7 +24,7 @@ class Invoice extends Model
         'due_date' => 'date',
     ];
 
-    public function order()
+    public function SalesOrder()
     {
         return $this->belongsTo(SalesOrder::class, 'order_id', 'order_id');
     }

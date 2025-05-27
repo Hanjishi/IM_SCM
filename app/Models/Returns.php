@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Returns extends Model
 {
-    protected $table = 'returns'; // 'returns' is a reserved keyword in some SQL, hence explicitly setting table name
+    protected $table = 'returns';
     protected $primaryKey = 'return_id';
 
     protected $fillable = [

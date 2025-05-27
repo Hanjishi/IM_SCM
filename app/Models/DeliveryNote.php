@@ -11,6 +11,7 @@ class DeliveryNote extends Model
 
     protected $fillable = [
         'order_id',
+        'customer_id',
         'delivery_date',
         'shipper',
         'tracking_number',
@@ -24,5 +25,10 @@ class DeliveryNote extends Model
     public function order()
     {
         return $this->belongsTo(SalesOrder::class, 'order_id', 'order_id');
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'customer_id', 'customer_id');
     }
 }

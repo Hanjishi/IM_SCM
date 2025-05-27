@@ -11,18 +11,29 @@ class LoyaltyProgram extends Model
 
     protected $fillable = [
         'program_name',
-        'points_per_currency_unit',
-        'redemption_rate',
-        'min_redemption_points',
-        'is_active',
+        'description',
+        'points_multiplier',
+        'minimum_purchase_amount',
+        'points_expiry_days',
+        'status'
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'points_multiplier' => 'float',
+        'minimum_purchase_amount' => 'float',
+        'points_expiry_days' => 'integer',
+        'status' => 'boolean',
     ];
 
-    public function customerLoyaltyPoints()
+
+    public function loyaltyPoints()
+    {
+        return $this->hasMany(LoyaltyPoint::class, 'program_id', 'program_id');
+    }
+
+    public function customers()
     {
         return $this->hasMany(CustomerLoyaltyPoint::class, 'program_id', 'program_id');
     }
+
 }
